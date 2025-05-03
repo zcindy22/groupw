@@ -1,0 +1,40 @@
+# ────────── Python ──────────
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+dist/
+build/
+*.log
+
+# ────────── Virtual Environments ──────────
+.venv/
+venv/
+ENV/
+env/
+*.env
+.env
+
+# ────────── Streamlit ──────────
+.streamlit/config.toml
+
+# ────────── Operating System Files ──────────
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ────────── IDEs and Editors ──────────
+.vscode/
+.idea/
+
+# ────────── Other ──────────
+*.sqlite3
+*.db
+*.bak
