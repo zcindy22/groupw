@@ -1,24 +1,25 @@
 import streamlit as st
-import requests
 import time
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from supabase_proj.db_utils import get_blacklist
 
 st.set_page_config(page_title="Free Editor", layout="centered")
 st.title("Free User Editor")
 
-# --- Session state setup for suspension timer ---
+# --- Suspension timer setup ---
 if "suspended_until" not in st.session_state:
     st.session_state.suspended_until = 0
 
-# --- Suspension check ---
 now = time.time()
 if now < st.session_state.suspended_until:
-    remaining = int(st.session_state.suspended_until - now)
-    st.error(f"You are suspended for exceeding 20 words. Try again in {remaining} seconds.")
+    st.error("Your account is suspended for 3 minutes due to word limit violation.")
     st.stop()
 
-# --- Input: Text box or file upload ---
+# --- Input method ---
 input_type = st.radio("Choose input method:", ["Text Box", "Upload .txt File"])
-
 user_text = ""
 
 if input_type == "Text Box":
@@ -29,25 +30,25 @@ else:
         user_text = uploaded_file.read().decode("utf-8")
         st.text_area("File content (read-only)", user_text, height=150, disabled=True)
 
-# --- Actions: Submit Text ---
+# --- Submit button logic ---
 if st.button("Submit"):
-    word_count = len(user_text.strip().split())
+    word_list = user_text.strip().split()
+    word_count = len(word_list)
 
     if word_count > 20:
-        st.session_state.suspended_until = now + 180  # suspend for 3 minutes
+        st.session_state.suspended_until = now + 180
         st.error("You entered more than 20 words. You are suspended for 3 minutes.")
     elif word_count == 0:
         st.warning("Please enter some text.")
     else:
         try:
-            res = requests.post("http://localhost:8000/api/free/submit", json={"text": user_text})
-            if res.status_code == 200:
-                filtered_text = res.json().get("filtered_text", "")
-                st.success("Text submitted successfully. Blacklisted words were filtered.")
-                st.text_area("Edit your corrected version here:", value=filtered_text, height=150)
-            else:
-                st.error("Submission failed. Please try again.")
-        except:
-            st.error("Could not connect to backend server.")
-
-
+            blacklist = get_blacklist()
+            filtered_words = [
+                "*" * len(word) if word.lower() in blacklist else word
+                for word in word_list
+            ]
+            filtered_text = " ".join(filtered_words)
+            st.success("Blacklisted words were filtered. You may correct the result below.")
+            st.text_area("Self-correction (editable):", value=filtered_text, height=150)
+        except Exception as e:
+            st.error("Could not connect to backend.")
