@@ -1,0 +1,14 @@
+[
+  {
+    "from": "me",
+    "to": "me",
+    "projectId": 9,
+    "status": "rejected"
+  },
+  {
+    "from": "me",
+    "to": "me",
+    "projectId": 7,
+    "status": "accepted"
+  }
+]
