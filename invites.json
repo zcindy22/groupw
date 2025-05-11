@@ -1,0 +1,8 @@
+[
+  {
+    "from": "userA",
+    "to": "userB",
+    "projectId": 2,
+    "status": "accepted"
+  }
+]

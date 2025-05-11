@@ -7,6 +7,7 @@ PROJECTS_FILE = "projects.json"
 TOKEN_FILE = "tokens.json"
 INVITES_FILE = "invites.json"
 COMPLAINTS_FILE = "complaints.json"
+USERS_FILE = "users.json"  # Shared user data file
 
 def load_json(file, default):
     if os.path.exists(file):
@@ -24,11 +25,24 @@ def load_projects():
 def save_projects(projects):
     save_json(PROJECTS_FILE, projects)
 
-def load_tokens():
-    return load_json(TOKEN_FILE, {"tokens": 50}).get("tokens", 50)
+def load_all_tokens():
+    return load_json(TOKEN_FILE, {})
 
-def save_tokens(tokens):
-    save_json(TOKEN_FILE, {"tokens": tokens})
+def save_all_tokens(tokens):
+    save_json(TOKEN_FILE, tokens)
+
+def get_user():
+    return st.session_state.get("username")
+
+def get_tokens(username):
+    all_tokens = load_all_tokens()
+    return all_tokens.get(username, 50)
+
+def update_tokens(username, change):
+    all_tokens = load_all_tokens()
+    all_tokens[username] = max(0, all_tokens.get(username, 50) + change)
+    save_all_tokens(all_tokens)
+    st.session_state.tokens = all_tokens[username]
 
 def load_invites():
     return load_json(INVITES_FILE, [])
@@ -42,16 +56,18 @@ def load_complaints():
 def save_complaints(complaints):
     save_json(COMPLAINTS_FILE, complaints)
 
-# -------------------- Token Logic --------------------
-if "tokens" not in st.session_state:
-    st.session_state.tokens = load_tokens()
-
-def update_tokens(change):
-    st.session_state.tokens = max(0, st.session_state.tokens + change)
-    save_tokens(st.session_state.tokens)
-
 # -------------------- UI Layout --------------------
 st.title("LLM Editor – E4 File Management")
+
+user = get_user()
+if not user:
+    st.error("You must be logged in to use this feature.")
+    st.stop()
+
+if "tokens" not in st.session_state:
+    st.session_state.tokens = get_tokens(user)
+
+st.markdown(f"**Logged in as:** `{user}`  ")
 st.markdown(f"**Tokens:** {st.session_state.tokens}")
 
 # -------------------- Save Project Form --------------------
@@ -67,39 +83,40 @@ if save_btn and st.session_state.tokens >= 5:
         "id": len(projects) + 1,
         "name": file_name,
         "content": file_content,
+        "owner": user,
         "sharedWith": [],
     }
     projects.append(new_project)
     save_projects(projects)
-    update_tokens(-5)
-    st.session_state.saved = True
+    update_tokens(user, -5)
+    st.success(f"Saved '{file_name}' and used 5 tokens.")
     st.rerun()
-elif save_btn and st.session_state.tokens < 5:
+elif save_btn:
     st.error("Not enough tokens to save a file.")
 
 # -------------------- My Projects --------------------
 st.subheader("My Projects")
 projects = load_projects()
 for project in projects:
-    with st.expander(project["name"]):
-        st.code(project["content"])
-        share_to = st.text_input(f"Share '{project['name']}' with: ", key=f"share_{project['id']}")
-        if st.button("Share", key=f"btn_{project['id']}"):
-            if share_to not in project["sharedWith"]:
-                project["sharedWith"].append(share_to)
-                save_projects(projects)
-                invites = load_invites()
-                invites.append({"from": "me", "to": share_to, "projectId": project["id"], "status": "pending"})
-                save_invites(invites)
-                st.success(f"Shared with {share_to}")
+    if project.get("owner") == user:
+        with st.expander(project["name"]):
+            st.code(project["content"])
+            share_to = st.text_input(f"Share '{project['name']}' with: ", key=f"share_{project['id']}")
+            if st.button("Share", key=f"btn_{project['id']}"):
+                if share_to not in project["sharedWith"]:
+                    project["sharedWith"].append(share_to)
+                    save_projects(projects)
+                    invites = load_invites()
+                    invites.append({"from": user, "to": share_to, "projectId": project["id"], "status": "pending"})
+                    save_invites(invites)
+                    st.success(f"Shared with {share_to}")
 
 # -------------------- Shared With Me --------------------
 st.subheader("Shared With Me")
-my_username = "me"  # Placeholder for current user
-to_me = [p for p in projects if my_username in p["sharedWith"]]
+shared_to_me = [p for p in projects if user in p.get("sharedWith", [])]
 
-if to_me:
-    for p in to_me:
+if shared_to_me:
+    for p in shared_to_me:
         st.write(f"**{p['name']}**")
         st.code(p["content"])
 else:
@@ -108,7 +125,7 @@ else:
 # -------------------- Invite Management --------------------
 st.subheader("Invites Sent To Me")
 invites = load_invites()
-my_invites = [i for i in invites if i["to"] == my_username and i["status"] == "pending"]
+my_invites = [i for i in invites if i["to"] == user and i["status"] == "pending"]
 
 if my_invites:
     for invite in my_invites:
@@ -121,7 +138,7 @@ if my_invites:
             st.rerun()
         if col2.button("Reject", key=f"rej_{invite['projectId']}"):
             invite["status"] = "rejected"
-            update_tokens(-3)  # Deduct from current user as simulation
+            update_tokens(user, -3)
             save_invites(invites)
             st.warning("Invite rejected. 3 tokens deducted from inviter (simulated).")
             st.rerun()
@@ -137,6 +154,6 @@ with st.form("complaint_form"):
 
 if submit_complaint:
     complaints = load_complaints()
-    complaints.append({"from": my_username, "about": complaint_user, "reason": complaint_reason})
+    complaints.append({"from": user, "about": complaint_user, "reason": complaint_reason})
     save_complaints(complaints)
     st.success("Complaint submitted. A super-user will review it.")

@@ -1,63 +1,114 @@
 import streamlit as st
-import requests
+import json
+import os
+from io import BytesIO
 
-API_URL = "http://localhost:5000/api"
+st.set_page_config(page_title="Documents", layout="centered")
+st.title("📂 My Documents")
 
-st.set_page_config(page_title="Load Document", layout="centered")
-st.title("📂 Load a Previous Document")
+# ---------- Restore login from cache if needed ----------
+if not st.session_state.get("logged_in") and os.path.exists("auth_cache.json"):
+    with open("auth_cache.json", "r") as f:
+        data = json.load(f)
+        st.session_state.logged_in = data.get("logged_in", False)
+        st.session_state.username = data.get("username", "")
+        st.session_state.role = data.get("role", "")
 
-# Check for login
-if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-    st.warning("Please log in to access your documents.")
+if not st.session_state.get("logged_in"):
+    st.warning("Please log in first to access your documents.")
     st.stop()
 
-username = st.session_state.get("username", "")
-user_text = st.session_state.get("user_text", "")
+# ---------- File paths ----------
+PROJECTS_FILE = "projects.json"
+INVITES_FILE = "invites.json"
+TOKEN_FILE = "tokens.json"
 
-# Fetch user's documents from the backend
-response = requests.get(f"{API_URL}/documents/{username}")
-if response.status_code != 200:
-    st.error("Failed to retrieve documents.")
-    st.stop()
+# ---------- Utility functions ----------
+def load_json(file, default):
+    if os.path.exists(file):
+        with open(file, "r") as f:
+            return json.load(f)
+    return default
 
-documents = response.json()
-if not documents:
-    st.info("You have no saved documents yet.")
-    st.stop()
+def save_json(file, data):
+    with open(file, "w") as f:
+        json.dump(data, f, indent=2)
 
-# Select document
-selected_doc = st.selectbox("Select a document to load:", documents, format_func=lambda doc: doc['title'])
+def load_projects():
+    return load_json(PROJECTS_FILE, [])
 
-# Click to load
-if st.button("📥 Load into Editor"):
-    """doc_id = selected_doc['id']
-    doc_response = requests.get(f"{API_URL}/document/{doc_id}")
-    if doc_response.status_code != 200:
-        st.error("Failed to load document content.")
-        st.stop()"""
+def save_projects(projects):
+    save_json(PROJECTS_FILE, projects)
 
-    """content_to_load = doc_response.json().get("content", "")"""
+def load_invites():
+    return load_json(INVITES_FILE, [])
 
-    # Check if there's already text in the editor
-    if user_text.strip():
-        """st.session_state.pending_doc_content = content_to_load"""
-        st.session_state.confirm_load = True
-        st.warning("⚠️ You already have content in the editor. Do you want to overwrite it?")
-    else:
-        """st.session_state.user_text = content_to_load"""
-        st.success("✅ Document loaded into editor.")
+def save_invites(invites):
+    save_json(INVITES_FILE, invites)
 
-# Confirm overwrite
-if st.session_state.get("confirm_load", False):
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("✅ Yes, overwrite editor content"):
-            st.session_state.user_text = st.session_state.pending_doc_content
-            st.session_state.pending_doc_content = ""
-            st.session_state.confirm_load = False
-            st.success("✅ Document loaded into editor.")
-    with col2:
-        if st.button("❌ Cancel"):
-            st.session_state.pending_doc_content = ""
-            st.session_state.confirm_load = False
-            st.info("Cancelled. Your editor content is unchanged.")
+def get_tokens(username):
+    tokens = load_json(TOKEN_FILE, {})
+    return tokens.get(username, 50)
+
+def update_tokens(username, change):
+    tokens = load_json(TOKEN_FILE, {})
+    tokens[username] = max(0, tokens.get(username, 50) + change)
+    save_json(TOKEN_FILE, tokens)
+    st.session_state.tokens = tokens[username]
+
+# ---------- Session ----------
+username = st.session_state.get("username")
+is_paid_user = st.session_state.get("role") == "paid"
+
+# ---------- My Projects ----------
+st.subheader("📁 My Saved Projects")
+projects = load_projects()
+my_projects = [p for p in projects if p.get("owner") == username]
+
+if my_projects:
+    for project in my_projects:
+        with st.expander(project["name"]):
+            st.code(project["content"])
+            share_to = st.text_input(f"Share '{project['name']}' with:", key=f"share_{project['id']}")
+            if st.button("Share", key=f"btn_{project['id']}"):
+                if share_to and share_to not in project["sharedWith"]:
+                    project["sharedWith"].append(share_to)
+                    save_projects(projects)
+                    invites = load_invites()
+                    invites.append({
+                        "from": username,
+                        "to": share_to,
+                        "projectId": project["id"],
+                        "status": "pending"
+                    })
+                    save_invites(invites)
+                    st.success(f"Shared with {share_to}")
+
+            # ---------- Download Button ----------
+            if is_paid_user:
+                file_content = project["content"]
+                file_bytes = BytesIO(file_content.encode("utf-8"))
+                filename = f"{project['name'].replace(' ', '_')}.txt"
+
+                if st.download_button("⬇️ Download as .txt", file_bytes, file_name=filename, mime="text/plain", key=f"dl_{project['id']}"):
+                    if get_tokens(username) >= 5:
+                        update_tokens(username, -5)
+                        st.success(f"Downloaded '{filename}' and deducted 5 tokens.")
+                else:
+                    st.error("Not enough tokens to download.")
+            else:
+                st.info("Upgrade to a paid account to download projects.")
+else:
+    st.info("You have no saved projects.")
+
+# ---------- Shared Projects ----------
+st.markdown("---")
+st.subheader("📬 Projects Shared With Me")
+shared_to_me = [p for p in projects if username in p.get("sharedWith", [])]
+
+if shared_to_me:
+    for p in shared_to_me:
+        st.write(f"**{p['name']}**")
+        st.code(p["content"])
+else:
+    st.info("No projects shared with you yet.")

@@ -1,11 +1,13 @@
 import streamlit as st
 from supabase_proj.db_utils import get_user_data
 from argon2 import PasswordHasher
+import json
+import os
 
 st.set_page_config(page_title="Login", layout="centered")
-st.title("Login")
+st.title("🔐 Login")
 
-# Session state
+# ------------- Session Defaults -------------
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
@@ -15,53 +17,57 @@ if 'username' not in st.session_state:
 if 'role' not in st.session_state:
     st.session_state.role = ""
 
-# Set up the password hasher
+# ------------- Password Hasher -------------
 ph = PasswordHasher()
 
+# ------------- Login Form -------------
 if not st.session_state.logged_in:
-    def sign_in():
-        st.write("Please enter your credentials to access your account.")
+    with st.form("login_form"):
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        submit = st.form_submit_button("Sign In")
 
-        with st.form("login_form"):
-            username = st.text_input("Username", placeholder="Enter your username")
-            password = st.text_input("Password", type="password", placeholder="Enter your password")
-            submit = st.form_submit_button("Sign In")
-
-        if submit:
-            if not username or not password:
-                st.warning("Please fill out both fields.")
-                return
-
+    if submit:
+        if not username or not password:
+            st.warning("Please enter both fields.")
+        else:
             user_data = get_user_data(username)
             if not user_data:
                 st.error("User not found.")
-                return
+            else:
+                stored_hash = user_data[0].get("password_hash")
+                if stored_hash:
+                    try:
+                        ph.verify(stored_hash, password)
+                        # ✅ Set session values
+                        st.session_state.logged_in = True
+                        st.session_state.username = username
+                        st.session_state.role = user_data[0].get("role", "")
 
-            stored_hash = user_data[0].get("password_hash")
-            if not stored_hash:
-                st.error("No password found for this user.")
-                return
+                        # ✅ Save to auth cache (for refresh persistence)
+                        with open("auth_cache.json", "w") as f:
+                            json.dump({
+                                "logged_in": True,
+                                "username": username,
+                                "role": st.session_state.role
+                            }, f)
 
-            try:
-                ph.verify(stored_hash, password)
-                st.success(f"Welcome back, {username}!")
-
-                # Set session state
-                st.session_state.logged_in = True
-                st.session_state.username = username
-
-            except Exception as e:
-                st.error("Invalid password")
-
-    if __name__ == "__main__":
-        sign_in()
-
-else: 
-    st.write("You are logged in :)")
+                        st.success(f"Welcome back, {username}!")
+                        st.rerun()  # Reload the page without showing old state
+                    except Exception:
+                        st.error("Invalid password.")
+                else:
+                    st.error("Password not set for this user.")
+else:
+    st.success(f"✅ Logged in as `{st.session_state.username}`")
     if st.button("Log Out"):
-        # Clear session state to log the user out
+        # Clear session + auth cache
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.session_state.role = ""
-        st.success("You have logged out successfully.")
+
+        if os.path.exists("auth_cache.json"):
+            os.remove("auth_cache.json")
+
+        st.success("You have been logged out.")
         st.rerun()
