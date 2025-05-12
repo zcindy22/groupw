@@ -7,7 +7,7 @@ from supabase_proj.db_utils     import (
     submit_blacklist_word
 )
 
-#from supabase_proj.llm_service  import correct
+from supabase_proj.llm_service  import correct
 
 st.set_page_config(page_title="Paid Editor", layout="wide")
 
@@ -25,7 +25,7 @@ def self_correction_flow(text: str, user_id: str):
             st.success(f"{changes} words changed → charged {changes//2} tokens")
         except ValueError as err:
             st.error(str(err))
-'''
+
 def llm_assist_flow(text: str, user_id: str):
     if not primary_button("Run LLM-Assist"):
         return
@@ -42,7 +42,7 @@ def llm_assist_flow(text: str, user_id: str):
             _charge_and_notify(user_id, "llm_accept", "Accepted suggestion")
         if c2.button(f"Reject {s['id']}"):
             _charge_and_notify(user_id, "llm_reject", "Rejected suggestion")
-'''
+
 
 def _charge_and_notify(user_id: str, action: str, msg: str):
     try:
@@ -74,7 +74,7 @@ def main():
     # now three tabs instead of two
     tab1, tab2, tab3 = st.tabs([
         "Self-Correction",
-        #"LLM-Assist",
+        "LLM-Assist",
         "Suggest A Blacklist Word"
     ])
 
@@ -82,7 +82,7 @@ def main():
         self_correction_flow(original, user_id)
 
     #with tab2:
-        #llm_assist_flow(original, user_id)
+        llm_assist_flow(original, user_id)
 
     with tab3:
         st.subheader("Submit a word to the blacklist:")
