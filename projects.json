@@ -14,5 +14,14 @@
     "sharedWith": [
       "userB"
     ]
+  },
+  {
+    "id": 3,
+    "name": "hi",
+    "content": "something",
+    "owner": "userA",
+    "sharedWith": [
+      "userB"
+    ]
   }
 ]

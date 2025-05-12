@@ -31,12 +31,6 @@ def load_notifications():
 def save_notifications(data):
     save_json(NOTIFICATIONS_FILE, data)
 
-def load_projects():
-    return load_json(PROJECTS_FILE, [])
-
-def save_projects(projects):
-    save_json(PROJECTS_FILE, projects)
-
 def update_tokens(username, change):
     tokens = load_json(TOKEN_FILE, {})
     tokens[username] = max(0, tokens.get(username, 50) + change)
@@ -58,6 +52,8 @@ if not st.session_state.get("logged_in") and os.path.exists("auth_cache.json"):
 
 user = st.session_state.get("username")
 if not user:
+    st.set_page_config(page_title="Notifications", layout="centered")
+    st.title("Notifications")
     st.error("You must be logged in to view this page.")
     st.stop()
 
@@ -117,25 +113,3 @@ if my_invites:
             st.rerun()
 else:
     st.info("No new invites at the moment.")
-
-# ---------- Shared Projects Editor ----------
-st.markdown("---")
-st.subheader("🤝 Collaborate on Shared Projects")
-
-accepted_invites = [i for i in invites if i["to"] == user and i["status"] == "accepted"]
-projects = load_projects()
-
-shared_projects = [p for p in projects if any(i["projectId"] == p["id"] for i in accepted_invites)]
-
-if shared_projects:
-    selected = st.selectbox("Choose a project to collaborate on:", shared_projects, format_func=lambda x: x["name"])
-    content = st.text_area("Edit Content:", value=selected["content"], height=300)
-    if st.button("💾 Save Changes", key=f"save_{selected['id']}"):
-        for p in projects:
-            if p["id"] == selected["id"]:
-                p["content"] = content
-                break
-        save_projects(projects)
-        st.success("Project updated successfully.")
-else:
-    st.info("No shared projects available to edit.")

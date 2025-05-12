@@ -6,7 +6,7 @@ from io import BytesIO
 st.set_page_config(page_title="Documents", layout="centered")
 st.title("📂 My Documents")
 
-# ---------- Restore login from cache if needed ----------
+# ---------- Restore login ----------
 if not st.session_state.get("logged_in") and os.path.exists("auth_cache.json"):
     with open("auth_cache.json", "r") as f:
         data = json.load(f)
@@ -23,7 +23,7 @@ PROJECTS_FILE = "projects.json"
 INVITES_FILE = "invites.json"
 TOKEN_FILE = "tokens.json"
 
-# ---------- Utility functions ----------
+# ---------- Utils ----------
 def load_json(file, default):
     if os.path.exists(file):
         with open(file, "r") as f:
@@ -84,31 +84,36 @@ if my_projects:
                     save_invites(invites)
                     st.success(f"Shared with {share_to}")
 
-            # ---------- Download Button ----------
+            # Download
             if is_paid_user:
-                file_content = project["content"]
-                file_bytes = BytesIO(file_content.encode("utf-8"))
+                file_bytes = BytesIO(project["content"].encode("utf-8"))
                 filename = f"{project['name'].replace(' ', '_')}.txt"
-
                 if st.download_button("⬇️ Download as .txt", file_bytes, file_name=filename, mime="text/plain", key=f"dl_{project['id']}"):
                     if get_tokens(username) >= 5:
                         update_tokens(username, -5)
                         st.success(f"Downloaded '{filename}' and deducted 5 tokens.")
-                else:
-                    st.error("Not enough tokens to download.")
+                    else:
+                        st.error("Not enough tokens to download.")
             else:
                 st.info("Upgrade to a paid account to download projects.")
 else:
     st.info("You have no saved projects.")
 
-# ---------- Shared Projects ----------
+# ---------- Shared With Me ----------
 st.markdown("---")
-st.subheader("📬 Projects Shared With Me")
+st.subheader("🤝 Projects Shared With Me")
 shared_to_me = [p for p in projects if username in p.get("sharedWith", [])]
 
 if shared_to_me:
-    for p in shared_to_me:
-        st.write(f"**{p['name']}**")
-        st.code(p["content"])
+    for i, p in enumerate(shared_to_me):
+        with st.expander(f"{p['name']} (from {p['owner']})"):
+            edited_text = st.text_area("Edit Content", p["content"], height=200, key=f"edit_shared_{i}")
+            if st.button("Save Changes", key=f"save_shared_{i}"):
+                for proj in projects:
+                    if proj["id"] == p["id"]:
+                        proj["content"] = edited_text
+                        save_projects(projects)
+                        st.success("Changes saved successfully.")
+                        st.rerun()
 else:
-    st.info("No projects shared with you yet.")
+    st.info("No projects shared with you.")

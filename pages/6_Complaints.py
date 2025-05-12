@@ -25,6 +25,9 @@ def save_complaints(complaints):
 user = st.session_state.get("username")
 role = st.session_state.get("role", "")
 
+st.set_page_config(page_title="Complaints", layout="centered")
+st.title("📣 File a Complaint")
+
 # Restore login state from cache file (if session lost on refresh)
 if not st.session_state.get("logged_in") and os.path.exists("auth_cache.json"):
     with open("auth_cache.json", "r") as f:
@@ -36,9 +39,6 @@ if not st.session_state.get("logged_in") and os.path.exists("auth_cache.json"):
 if not user:
     st.error("Please log in to access this page.")
     st.stop()
-
-st.set_page_config(page_title="Complaints", layout="centered")
-st.title("📣 File a Complaint")
 
 # ---------- Complaint Form ----------
 st.subheader("Submit a Complaint")

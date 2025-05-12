@@ -7,7 +7,7 @@ import os
 st.set_page_config(page_title="Admin", layout="centered")
 st.title("Admin Dashboard")
 
-# Restore login state from cache file (if session lost on refresh)
+# ---------- Restore login if session lost ----------
 if not st.session_state.get("logged_in") and os.path.exists("auth_cache.json"):
     with open("auth_cache.json", "r") as f:
         data = json.load(f)
@@ -29,7 +29,7 @@ if role != "admin" and not st.session_state.get("is_admin"):
     st.error("Access denied. Admins only.")
     st.stop()
 
-# ---------- Local File Utilities ----------
+# ---------- File Utilities ----------
 COMPLAINTS_FILE = "complaints.json"
 TOKEN_FILE = "tokens.json"
 NOTIFICATIONS_FILE = "notifications.json"
@@ -68,36 +68,42 @@ POTENTIAL_URL = f'{BASE_URL}/potential'
 BLACKLISTED_URL = f'{BASE_URL}/blacklisted'
 
 st.subheader("🕵️ Review Potential Words")
-response = requests.get(POTENTIAL_URL)
-if response.status_code == 200:
-    potential_words = response.json()
-    if not potential_words:
-        st.info("No potential blacklisted words at the moment.")
+try:
+    response = requests.get(POTENTIAL_URL)
+    if response.status_code == 200:
+        potential_words = response.json()
+        if not potential_words:
+            st.info("No potential blacklisted words at the moment.")
+        else:
+            for word in potential_words:
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    st.write(f"**{word}**")
+                with col2:
+                    if st.button("✅ Approve", key=f"approve-{word}"):
+                        res = requests.post(f"{POTENTIAL_URL}/approve/{word}")
+                        st.success(res.json().get("message", "Approved"))
+                        st.rerun()
+                with col3:
+                    if st.button("❌ Deny", key=f"deny-{word}"):
+                        res = requests.post(f"{POTENTIAL_URL}/deny/{word}")
+                        st.warning(res.json().get("message", "Denied"))
+                        st.rerun()
     else:
-        for word in potential_words:
-            col1, col2, col3 = st.columns([2, 1, 1])
-            with col1:
-                st.write(f"**{word}**")
-            with col2:
-                if st.button("✅ Approve", key=f"approve-{word}"):
-                    res = requests.post(f"{POTENTIAL_URL}/approve/{word}")
-                    st.success(res.json().get("message", "Approved"))
-                    st.experimental_rerun()
-            with col3:
-                if st.button("❌ Deny", key=f"deny-{word}"):
-                    res = requests.post(f"{POTENTIAL_URL}/deny/{word}")
-                    st.warning(res.json().get("message", "Denied"))
-                    st.experimental_rerun()
-else:
-    st.error("Failed to fetch potential words.")
+        st.error("Failed to fetch potential words.")
+except requests.exceptions.ConnectionError:
+    st.error("⚠️ Could not connect to the blacklisted words API.")
 
 # ---------- Confirmed List ----------
 st.subheader("🚫 Confirmed Blacklisted Words")
-response = requests.get(BLACKLISTED_URL)
-if response.status_code == 200:
-    st.write(response.json())
-else:
-    st.error("Failed to load blacklisted words.")
+try:
+    response = requests.get(BLACKLISTED_URL)
+    if response.status_code == 200:
+        st.write(response.json())
+    else:
+        st.error("Failed to load blacklisted words.")
+except requests.exceptions.ConnectionError:
+    st.error("⚠️ Could not connect to the blacklisted words API.")
 
 # ---------- Complaint Review ----------
 st.markdown("---")
@@ -113,28 +119,42 @@ if complaints:
             if c.get("rebuttal"):
                 st.info(f"**Rebuttal:** {c['rebuttal']}")
 
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                if st.button("🗑️ Delete Complaint", key=f"del_{i}"):
-                    complaints.pop(i)
-                    save_complaints(complaints)
-                    st.success("Complaint deleted.")
-                    st.experimental_rerun()
+            st.markdown("**Choose an action:**")
+            action = st.selectbox(
+                f"Action for Complaint #{i+1}",
+                options=["No Action", "Penalize Complainer", "Penalize Reported User"],
+                key=f"action_{i}"
+            )
+            penalty_amt = st.number_input(
+                "Token Penalty Amount (if applicable)", min_value=0, max_value=50, value=0, key=f"penalty_amt_{i}"
+            )
 
-            with col2:
-                penalty_from = st.number_input(f"Penalty to complainer", min_value=1, max_value=50, value=5, key=f"penalty_from_{i}")
-                if st.button("⚠️ Penalize Complainer", key=f"penalize_from_{i}"):
-                    update_tokens(c['from'], -penalty_from)
-                    notifications.append({"to": c['from'], "message": f"You were penalized {penalty_from} tokens for an invalid complaint."})
-                    save_notifications(notifications)
-                    st.success(f"{penalty_from} tokens deducted from complainer.")
+            if st.button("✅ Apply Action", key=f"apply_{i}"):
+                if action == "Penalize Complainer" and penalty_amt > 0:
+                    update_tokens(c['from'], -penalty_amt)
+                    notifications.append({
+                        "to": c['from'],
+                        "message": f"You were penalized {penalty_amt} tokens for a rejected complaint."
+                    })
+                    st.success(f"{penalty_amt} tokens deducted from complainer.")
 
-            with col3:
-                penalty_about = st.number_input(f"Penalty to reported user", min_value=1, max_value=50, value=5, key=f"penalty_about_{i}")
-                if st.button("⚠️ Penalize Reported User", key=f"penalize_about_{i}"):
-                    update_tokens(c['about'], -penalty_about)
-                    notifications.append({"to": c['about'], "message": f"You were penalized {penalty_about} tokens due to a confirmed complaint."})
-                    save_notifications(notifications)
-                    st.success(f"{penalty_about} tokens deducted from reported user.")
+                elif action == "Penalize Reported User" and penalty_amt > 0:
+                    update_tokens(c['about'], -penalty_amt)
+                    notifications.append({
+                        "to": c['about'],
+                        "message": f"You were penalized {penalty_amt} tokens due to a confirmed complaint."
+                    })
+                    st.success(f"{penalty_amt} tokens deducted from reported user.")
+
+                elif action == "No Action":
+                    st.info("No penalty applied.")
+
+                else:
+                    st.warning("Penalty must be greater than 0 to apply.")
+
+                complaints.pop(i)
+                save_complaints(complaints)
+                save_notifications(notifications)
+                st.rerun()
 else:
     st.info("No complaints submitted yet.")
