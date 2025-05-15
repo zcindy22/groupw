@@ -1,5 +1,12 @@
 import streamlit as st
-from supabase_proj.client import create_client, Client
-from dotenv import load_dotenv
-import os
-from argon2 import PasswordHasher
+
+st.set_page_config(page_title="Paid Editor", layout="wide")
+
+st.title("🔒 Paid User Editor")
+st.write("Welcome to the Paid User Editor")
+
+user_text = st.text_area("Enter your text:", height=300)
+
+if st.button("Process Text"):
+    word_count = len(user_text.split())
+    st.success(f"Processed text with {word_count} words!")

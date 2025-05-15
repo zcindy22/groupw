@@ -157,4 +157,4 @@ if complaints:
                 save_notifications(notifications)
                 st.rerun()
 else:
-    st.info("No complaints submitted yet.")
+    st.info("No complaints submitted yet.") 

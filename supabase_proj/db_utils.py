@@ -1,10 +1,12 @@
 # supabase/db_utils.py
+import supabase
 from supabase_proj.client import SupabaseClient
-from supabase_proj.client import SupabaseClient
+import streamlit as st
 
-def get_user_data(username: str):
+@st.cache_data
+def get_user_data(email: str):
     client = SupabaseClient.get_client()
-    response = client.table("users").select("*").eq("username", username).execute()
+    response = client.table("profiles").select("*").eq("email", email).execute()
     return response.data  # This is a list of matching user records
 
 def insert_user(username: str, password_hash: str):
@@ -14,6 +16,59 @@ def insert_user(username: str, password_hash: str):
         "password_hash": password_hash
     }).execute()
     return response.data
+
+
+def add_tokens(amount: int):
+    client = SupabaseClient.get_client()
+
+    # get current token amount
+    user_data = client.table("profiles").select("tokens").eq("id", st.session_state.id).single().execute()
+    current_tokens = user_data.data["tokens"]
+
+    # add to token amount
+    response = client.table("profiles").update({
+        "tokens": current_tokens + amount
+    }).eq("id", st.session_state.id).execute()
+
+    return response.data
+
+def sign_up(email, password):
+    try:
+        client = SupabaseClient.get_client()
+
+        # Supabase Auth sign-up
+        result = client.auth.sign_up({"email": email, "password": password})
+
+        # Check if the sign-up was successful
+        user = result.user
+        if user is None:
+            raise Exception("Sign-up failed: user not created")
+
+        user_id = user.id  # UUID from Supabase Auth
+        
+        st.session_state.logged_in = True
+        st.session_state.email = email
+        st.session_state.id = user_id
+        add_reload()
+
+    except Exception as e:
+        raise Exception(f"Error during sign-up: {e}")
+
+def sign_in_user(email, password):
+    try:
+        client = SupabaseClient.get_client()
+        response = client.auth.sign_in_with_password({"email": email, "password": password})
+        
+        if response:
+            st.session_state.logged_in = True
+            st.session_state.email = email
+            st.session_state.id = response.user.id
+            add_reload()
+            st.success(f"Welcome back, {email}!")
+        else:
+            st.error("Invalid email or password.")
+    except Exception as e:
+        st.error(f"Error logging in: {e}")
 
 
 def get_blacklist():
@@ -30,3 +85,31 @@ def suggest_blacklist_word(word: str, submitted_by: str = None):
         payload["submitted_by"] = submitted_by  # must match uuid if used
     response = client.table("blacklist").insert(payload).execute()
     return response.data
+
+def add_reload():
+    client = SupabaseClient.get_client()
+    if "user" not in st.session_state:
+        # Optional: you can identify user via a temporary session cookie or query param
+        session_rows = client.table("sessions").select("*").order("created_at", desc=True).limit(1).execute()
+
+        if session_rows.data:
+            token = session_rows.data[0]["refresh_token"]
+
+            # Restore session using Supabase
+            restored = client.auth.set_session(access_token="", refresh_token=token)
+
+            if restored.session:
+                st.session_state.id = restored.user.id
+                st.session_state.id = restored.user.email
+                st.session_state.logged_in = True
+                st.session_state.refresh_token = restored.session.refresh_token
+
+def check_reload():
+    client = SupabaseClient.get_client()
+    session_res = client.table("sessions").select("*").order("created_at", desc=True).limit(1).execute()
+    if session_res.data:
+        refresh_token = session_res.data[0]["refresh_token"]
+        restored = client.auth.set_session("", refresh_token)
+        if restored.session:
+            st.session_state.user = restored.user
+            st.session_state.refresh_token = restored.session.refresh_token
