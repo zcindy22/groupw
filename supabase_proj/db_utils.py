@@ -9,6 +9,11 @@ def get_user_data(id: str):
     response = client.table("profiles").select("*").eq("id", id).execute()
     return response.data  # This is a list of matching user records
 
+def see_username_exist(email: str):
+    client = SupabaseClient.get_client()
+    response = client.table("profiles").select("*").eq("email", email).execute()
+    return response.data  # This is a list of matching user records
+
 def insert_user(username: str, password_hash: str):
     client = SupabaseClient.get_client()
     response = client.table("users").insert({
@@ -49,13 +54,16 @@ def sign_up(email, password):
             raise Exception("Sign-up failed: user not created")
 
         user_id = user.id  # UUID from Supabase Auth
-        
+
         st.session_state.logged_in = True
         st.session_state.email = email
         st.session_state.id = user_id
-        user_data = get_user_data(user_id)
-        st.session_state.role = user_data[0].get("role")
-        st.session_state.status = user_data[0].get("status")
+        try:
+            user_data = get_user_data(user_id)
+            st.session_state.role = user_data[0].get("role")
+            st.session_state.status = user_data[0].get("status")
+        except Exception as inner:
+            raise Exception(f"Sign-up worked, but fetching profile failed: {inner}")
 
     except Exception as e:
         raise Exception(f"Error during sign-up: {e}")

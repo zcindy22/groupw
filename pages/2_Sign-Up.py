@@ -1,7 +1,7 @@
 import streamlit as st
 #from argon2 import PasswordHasher
 from supabase_proj.db_utils import insert_user, sign_up
-from supabase_proj.db_utils import get_user_data
+from supabase_proj.db_utils import get_user_data, see_username_exist
 
 #ph = PasswordHasher()
 
@@ -25,7 +25,7 @@ with st.form("signup_form"):
             st.error("Passwords do not match.")
         else:
             # Replace this with actual user registration logic (e.g. save to DB)
-            exist_user = get_user_data(username)
+            exist_user = see_username_exist(username)
             
             if exist_user:
                 st.error("Username taken")

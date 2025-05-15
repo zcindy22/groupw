@@ -1,4 +1,5 @@
 import streamlit as st
+from supabase_proj.db_utils import suspend_user
 import time
 import re
 import sys
@@ -11,16 +12,19 @@ from supabase_proj.db_utils import get_blacklist, suggest_blacklist_word
 st.set_page_config(page_title="Free Editor", layout="centered")
 st.title("Free User Editor")
 
-# Suspension timer setup 
-if "suspended_until" not in st.session_state:
-    st.session_state.suspended_until = 0
+if 'logged_in' not in st.session_state:
+    st.error("Please log in first!")
+    st.stop()
 
-now = time.time()
-if now < st.session_state.suspended_until:
+if st.session_state.status == "suspended":
     st.error("Your account is suspended for 3 minutes due to word limit violation.")
     st.stop()
 
-#  Input method 
+if st.session_state.role != "free":
+    st.error("Please use the paid user editor!")
+    st.stop()
+
+# --- Input method ---
 input_type = st.radio("Choose input method:", ["Text Box", "Upload .txt File"])
 user_text = ""
 
@@ -37,16 +41,12 @@ if st.button("Submit"):
     word_list = re.findall(r'\b\w+\b', user_text.strip())
     word_count = len(word_list)
 
-    
-
-
     if word_count > 20:
-        st.session_state.suspended_until = now + 180  # 3 minutes
+        suspend_user()
         st.error("You entered more than 20 words. You are suspended for 3 minutes.")
     elif word_count == 0:
         st.warning("Please enter some text.")
 
-    
     elif all(not word.isalpha() for word in word_list):
         st.warning("Please enter meaningful text.")
     else:
