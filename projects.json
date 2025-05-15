@@ -1,0 +1,39 @@
+[
+  {
+    "id": 1,
+    "name": "checking",
+    "content": "trash kk\n",
+    "owner": "",
+    "sharedWith": [
+      "karthik@gmail.com"
+    ]
+  },
+  {
+    "id": 2,
+    "name": "2",
+    "content": "hi",
+    "owner": "",
+    "sharedWith": []
+  },
+  {
+    "id": 3,
+    "name": "hi",
+    "content": "hi",
+    "owner": "",
+    "sharedWith": []
+  },
+  {
+    "id": 4,
+    "name": "hi",
+    "content": "hi",
+    "owner": "karthik@gmail.com",
+    "sharedWith": []
+  },
+  {
+    "id": 5,
+    "name": "hi",
+    "content": "hi ",
+    "owner": "karthik@gmail.com",
+    "sharedWith": []
+  }
+]

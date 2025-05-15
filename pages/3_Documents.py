@@ -1,63 +1,73 @@
 import streamlit as st
-import requests
+from io import BytesIO
+import sys, os
 
-API_URL = "http://localhost:5000/api"
+# Supabase helpers
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from supabase_proj.db_utils import (
+    get_user_documents,
+    get_shared_documents,
+    get_tokens,
+    update_tokens
+)
 
-st.set_page_config(page_title="Load Document", layout="centered")
-st.title("📂 Load a Previous Document")
+st.set_page_config(page_title="Documents", layout="centered")
+st.title("📂 My Documents")
 
-# Check for login
-if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-    st.warning("Please log in to access your documents.")
+# ---------- Session ----------
+if not st.session_state.get("logged_in"):
+    st.warning("Please log in first to access your documents.")
     st.stop()
 
-username = st.session_state.get("username", "")
-user_text = st.session_state.get("user_text", "")
+user_id = st.session_state.get("user_id")  # Supabase user ID
+username = st.session_state.get("username")
+is_paid_user = st.session_state.get("role") == "paid"
 
-# Fetch user's documents from the backend
-response = requests.get(f"{API_URL}/documents/{username}")
-if response.status_code != 200:
-    st.error("Failed to retrieve documents.")
-    st.stop()
+# ---------- Data Loading ----------
+my_projects = get_user_documents(user_id)
+shared_docs = get_shared_documents(user_id)
+tokens = get_tokens(user_id) if is_paid_user else None
 
-documents = response.json()
-if not documents:
-    st.info("You have no saved documents yet.")
-    st.stop()
+# ---------- Top Stats ----------
+st.markdown("### 📊 Usage Summary")
+st.markdown(f"- **Username:** `{username}`")
+st.markdown(f"- **Documents Created:** `{len(my_projects)}`")
+st.markdown(f"- **Documents Shared With You:** `{len(shared_docs)}`")
+if is_paid_user:
+    st.markdown(f"- **Tokens Available:** `{tokens}`")
+else:
+    st.info("Upgrade to a paid account to see and use tokens.")
 
-# Select document
-selected_doc = st.selectbox("Select a document to load:", documents, format_func=lambda doc: doc['title'])
+# ---------- My Documents ----------
+st.subheader("📁 My Saved Documents")
+if not my_projects:
+    st.info("You have no saved documents.")
+else:
+    for doc in my_projects:
+        with st.expander(f"📝 Created: {doc['created_at']}"):
+            st.code(doc["content"], language="text")
 
-# Click to load
-if st.button("📥 Load into Editor"):
-    """doc_id = selected_doc['id']
-    doc_response = requests.get(f"{API_URL}/document/{doc_id}")
-    if doc_response.status_code != 200:
-        st.error("Failed to load document content.")
-        st.stop()"""
+            # Download logic (paid only)
+            if is_paid_user:
+                file_bytes = BytesIO(doc["content"].encode("utf-8"))
+                filename = f"document_{doc['id']}.txt"
+                if st.download_button("⬇️ Download", file_bytes, file_name=filename, mime="text/plain", key=f"dl_{doc['id']}"):
+                    if tokens >= 5:
+                        update_tokens(user_id, -5)
+                        st.success(f"Downloaded '{filename}'. 5 tokens deducted.")
+                        tokens -= 5  # update locally
+                    else:
+                        st.error("Not enough tokens to download.")
+            else:
+                st.info("Upgrade to a paid account to download documents.")
 
-    """content_to_load = doc_response.json().get("content", "")"""
-
-    # Check if there's already text in the editor
-    if user_text.strip():
-        """st.session_state.pending_doc_content = content_to_load"""
-        st.session_state.confirm_load = True
-        st.warning("⚠️ You already have content in the editor. Do you want to overwrite it?")
-    else:
-        """st.session_state.user_text = content_to_load"""
-        st.success("✅ Document loaded into editor.")
-
-# Confirm overwrite
-if st.session_state.get("confirm_load", False):
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("✅ Yes, overwrite editor content"):
-            st.session_state.user_text = st.session_state.pending_doc_content
-            st.session_state.pending_doc_content = ""
-            st.session_state.confirm_load = False
-            st.success("✅ Document loaded into editor.")
-    with col2:
-        if st.button("❌ Cancel"):
-            st.session_state.pending_doc_content = ""
-            st.session_state.confirm_load = False
-            st.info("Cancelled. Your editor content is unchanged.")
+# ---------- Shared Documents ----------
+st.markdown("---")
+st.subheader("🤝 Documents Shared With Me")
+if not shared_docs:
+    st.info("No documents shared with you.")
+else:
+    for i, doc in enumerate(shared_docs):
+        with st.expander(f"📄 From: {doc['user_id']} | Created: {doc['created_at']}"):
+            st.code(doc["content"], language="text")
+            st.info("Editing shared documents is not yet implemented.")

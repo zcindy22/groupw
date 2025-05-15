@@ -38,3 +38,4 @@ $RECYCLE.BIN/
 *.sqlite3
 *.db
 *.bak
+jsonkeys/llm-editor-w.json

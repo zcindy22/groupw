@@ -1,24 +1,25 @@
 import streamlit as st
-from supabase_proj.db_utils import get_user_data
-from argon2 import PasswordHasher
 
 st.set_page_config(page_title="Login", layout="centered")
+
+from supabase_proj.db_utils import get_user_data, sign_in_user, check_reload
+from argon2 import PasswordHasher
+
 st.title("Login")
 
 # Session state
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
+for key, default in {
+    "logged_in": False,
+    "username": "",
+    "role": "",
+    "status": ""
+}.items():
+    if key not in st.session_state:
+        st.session_state[key] = default
 
-if 'username' not in st.session_state:
-    st.session_state.username = ""
-
-if 'role' not in st.session_state:
-    st.session_state.role = ""
-
-# Set up the password hasher
-ph = PasswordHasher()
 
 if not st.session_state.logged_in:
+
     def sign_in():
         st.write("Please enter your credentials to access your account.")
 
@@ -32,36 +33,30 @@ if not st.session_state.logged_in:
                 st.warning("Please fill out both fields.")
                 return
 
-            user_data = get_user_data(username)
-            if not user_data:
-                st.error("User not found.")
-                return
+            #user_data = get_user_data(username)
+            #if not user_data:
+            #    st.error("User not found.")
+            #    return
 
-            stored_hash = user_data[0].get("password_hash")
-            if not stored_hash:
-                st.error("No password found for this user.")
-                return
+            #stored_hash = user_data[0].get("password_hash")
+            #if not stored_hash:
+               # st.error("No password found for this user.")
+               # return
 
             try:
-                ph.verify(stored_hash, password)
-                st.success(f"Welcome back, {username}!")
+                sign_in_user(username, password)
 
-                # Set session state
-                st.session_state.logged_in = True
-                st.session_state.username = username
 
-            except Exception as e:
+            except Exception:
                 st.error("Invalid password")
 
-    if __name__ == "__main__":
-        sign_in()
+    sign_in()
 
-else: 
+else:
+
     st.write("You are logged in :)")
     if st.button("Log Out"):
         # Clear session state to log the user out
-        st.session_state.logged_in = False
-        st.session_state.username = ""
-        st.session_state.role = ""
+        st.session_state.clear()
         st.success("You have logged out successfully.")
         st.rerun()
