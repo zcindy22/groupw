@@ -134,3 +134,101 @@ def check_reload():
             st.session_state.id = restored.user.id
             st.session_state.refresh_token = restored.session.refresh_token
             st.session_state.logged_in = True
+
+def get_user_documents(user_id):
+    client = SupabaseClient.get_client()
+    response = client.table("texts").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+    return response.data if response.data else []
+
+def get_shared_documents(user_id):
+    client = SupabaseClient.get_client()
+
+    # Get all text_ids from collaborations where user is the invitee and status is accepted
+    collab_res = client.table("collaborations").select("text_id").eq("invitee_id", user_id).eq("status", "accepted").execute()
+    text_ids = [row["text_id"] for row in collab_res.data]
+
+    if not text_ids:
+        return []
+
+    # Get the actual text documents
+    text_res = client.table("texts").select("*").in_("id", text_ids).execute()
+    return text_res.data if text_res.data else []
+
+def get_tokens(user_id):
+    client = SupabaseClient.get_client()
+    response = client.table("profiles").select("tokens").eq("id", user_id).single().execute()
+    return response.data["tokens"] if response.data else 0
+
+def update_tokens(user_id, change):
+    client = SupabaseClient.get_client()
+
+    # get current token amount
+    user_data = client.table("profiles").select("tokens").eq("id", user_id).single().execute()
+    current_tokens = user_data.data["tokens"]
+
+    # add to token amount
+    response = client.table("profiles").update({
+        "tokens": current_tokens + change
+    }).eq("id", user_id).execute()
+
+    return response.data
+
+
+def get_incoming_collab_requests(user_id):
+    client = SupabaseClient.get_client()
+    res = client.table("collaborations").select("*").eq("invitee_id", user_id).eq("status", "pending").execute()
+    return res.data if res.data else []
+
+def get_outgoing_collab_requests(user_id):
+    client = SupabaseClient.get_client()
+    res = client.table("collaborations").select("*").eq("inviter_id", user_id).eq("status", "pending").execute()
+    return res.data if res.data else []
+
+
+def respond_to_request(collab_id, action):  # action: "accepted" or "rejected"
+    client = SupabaseClient.get_client()
+    res = client.table("collaborations").update({"status": action}).eq("id", collab_id).execute()
+    return res.data
+
+def get_text_title(text_id):
+    client = SupabaseClient.get_client()
+    res = client.table("texts").select("docname").eq("id", text_id).single().execute()
+    return res.data["docname"] if res.data else "(untitled)"
+
+def get_user_data_by_email(email):
+    client = SupabaseClient.get_client()
+    res = client.table("profiles").select("*").eq("email", email).execute()
+    return res.data if res.data else []
+
+def send_collab_request(inviter_id, invitee_id, text_id):
+    client = SupabaseClient.get_client()
+    payload = {
+        "inviter_id": inviter_id,
+        "invitee_id": invitee_id,
+        "text_id": text_id,
+        "status": "pending"
+    }
+    client.table("collaborations").insert(payload).execute()
+
+def submit_complaint_by_email(complainer_id, accused_email, text_id, reason):
+    client = SupabaseClient.get_client()
+
+    # Look up accused user's ID from their email
+    accused_res = client.table("profiles").select("id").eq("email", accused_email).single().execute()
+    if not accused_res.data:
+        raise Exception("User with that email not found.")
+    
+    accused_id = accused_res.data["id"]
+
+    # Insert complaint
+    payload = {
+        "complainer_id": complainer_id,
+        "accused_id": accused_id,
+        "text_id": text_id,
+        "reason": reason,
+        "status": "pending",
+        "decision": None,
+        "reviewed_by": None
+    }
+    res = client.table("complaints").insert(payload).execute()
+    return res.data

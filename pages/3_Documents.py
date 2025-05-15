@@ -19,9 +19,14 @@ if not st.session_state.get("logged_in"):
     st.warning("Please log in first to access your documents.")
     st.stop()
 
-user_id = st.session_state.get("user_id")  # Supabase user ID
-username = st.session_state.get("username")
+
+username = st.session_state.get("email")
 is_paid_user = st.session_state.get("role") == "paid"
+
+user_id = st.session_state.get("id")
+if not user_id:
+    st.error("User ID not found. Please log in again.")
+    st.stop()
 
 # ---------- Data Loading ----------
 my_projects = get_user_documents(user_id)
@@ -55,7 +60,7 @@ else:
                     if tokens >= 5:
                         update_tokens(user_id, -5)
                         st.success(f"Downloaded '{filename}'. 5 tokens deducted.")
-                        tokens -= 5  # update locally
+                        tokens -= 5
                     else:
                         st.error("Not enough tokens to download.")
             else:
@@ -68,6 +73,9 @@ if not shared_docs:
     st.info("No documents shared with you.")
 else:
     for i, doc in enumerate(shared_docs):
-        with st.expander(f"📄 From: {doc['user_id']} | Created: {doc['created_at']}"):
-            st.code(doc["content"], language="text")
-            st.info("Editing shared documents is not yet implemented.")
+        with st.expander(f"📝 {doc['docname']} (Created: {doc['created_at']})"):
+            edited_text = st.text_area("Edit shared content", doc["content"], height=200, key=f"edit_shared_{i}")
+            if st.button("Save Changes", key=f"save_shared_{i}"):
+                st.warning("Saving shared edits is not yet implemented.")
+
+# ---------- Future Feature ----------

@@ -1,61 +1,39 @@
 import streamlit as st
-import json
-import os
-
-COMPLAINTS_FILE = "complaints.json"
-
-# ---------- Helpers ----------
-def load_json(file, default):
-    if os.path.exists(file):
-        with open(file, "r") as f:
-            return json.load(f)
-    return default
-
-def save_json(file, data):
-    with open(file, "w") as f:
-        json.dump(data, f, indent=2)
-
-def load_complaints():
-    return load_json(COMPLAINTS_FILE, [])
-
-def save_complaints(complaints):
-    save_json(COMPLAINTS_FILE, complaints)
-
-# ---------- Auth ----------
-user = st.session_state.get("username")
-role = st.session_state.get("role", "")
+from supabase_proj.db_utils import get_user_documents, submit_complaint_by_email
 
 st.set_page_config(page_title="Complaints", layout="centered")
 st.title("📣 File a Complaint")
 
-# Restore login state from cache file (if session lost on refresh)
-if not st.session_state.get("logged_in") and os.path.exists("auth_cache.json"):
-    with open("auth_cache.json", "r") as f:
-        data = json.load(f)
-        st.session_state.logged_in = data.get("logged_in", False)
-        st.session_state.username = data.get("username", "")
-        st.session_state.role = data.get("role", "")
-
-if not user:
-    st.error("Please log in to access this page.")
+if not st.session_state.get("logged_in"):
+    st.warning("Please log in to file a complaint.")
     st.stop()
 
-# ---------- Complaint Form ----------
+user_id = st.session_state.get("id")
+if not user_id:
+    st.error("User ID not found in session.")
+    st.stop()
+
+my_docs = get_user_documents(user_id)
+doc_options = {doc["docname"]: doc["id"] for doc in my_docs}
+
 st.subheader("Submit a Complaint")
 with st.form("complaint_form"):
-    complaint_user = st.text_input("Who are you reporting?")
-    complaint_reason = st.text_area("Why are you reporting them?")
-    submit_complaint = st.form_submit_button("Submit Complaint")
+    accused_email = st.text_input("Accused User's Email")
+    text_choice = st.selectbox("Select Related Document", list(doc_options.keys()))
+    reason = st.text_area("Describe the Issue")
+    submit = st.form_submit_button("Submit Complaint")
 
-if submit_complaint:
-    if not complaint_user or not complaint_reason:
-        st.warning("Please fill out all fields.")
-    else:
-        complaints = load_complaints()
-        complaints.append({
-            "from": user,
-            "about": complaint_user,
-            "reason": complaint_reason
-        })
-        save_complaints(complaints)
-        st.success("Complaint submitted. A super-user will review it.")
+    if submit:
+        if not accused_email or not reason:
+            st.warning("All fields must be filled.")
+        else:
+            try:
+                submit_complaint_by_email(
+                    complainer_id=user_id,
+                    accused_email=accused_email,
+                    text_id=doc_options[text_choice],
+                    reason=reason
+                )
+                st.success("Complaint submitted successfully.")
+            except Exception as e:
+                st.error(f"Failed to submit complaint: {e}")
