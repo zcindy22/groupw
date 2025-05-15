@@ -8,7 +8,8 @@ st.title("Buy Tokens")
 
 # Session state
 if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
+    st.error("Please log in first!")
+    st.stop()
 
 if 'x' not in st.session_state:
     st.session_state.x = None
@@ -90,9 +91,5 @@ if st.session_state.logged_in:
 
                     except Exception as e: 
                         st.error(f"Error: {e}")
-
-    if __name__ == "__main__":
-        buy_tokens()
-
-else: 
-    st.write("Please log in first.")
+    
+    buy_tokens()

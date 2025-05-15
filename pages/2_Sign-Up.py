@@ -35,7 +35,6 @@ with st.form("signup_form"):
             try: 
                 sign_up(username, password)
                 st.success("Account Created! Welcome!")
-                
 
             except Exception as e: 
                 st.error(f"Error: {e}")

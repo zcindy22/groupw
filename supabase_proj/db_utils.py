@@ -4,9 +4,9 @@ from supabase_proj.client import SupabaseClient
 import streamlit as st
 
 @st.cache_data
-def get_user_data(email: str):
+def get_user_data(id: str):
     client = SupabaseClient.get_client()
-    response = client.table("profiles").select("*").eq("email", email).execute()
+    response = client.table("profiles").select("*").eq("id", id).execute()
     return response.data  # This is a list of matching user records
 
 def insert_user(username: str, password_hash: str):
@@ -17,6 +17,10 @@ def insert_user(username: str, password_hash: str):
     }).execute()
     return response.data
 
+def suspend_user():
+    client = SupabaseClient.get_service_client()
+    client.table("profiles").update({
+    "status": "suspended"}).eq("id", st.session_state.id).execute()
 
 def add_tokens(amount: int):
     client = SupabaseClient.get_client()
@@ -49,7 +53,9 @@ def sign_up(email, password):
         st.session_state.logged_in = True
         st.session_state.email = email
         st.session_state.id = user_id
-        add_reload()
+        user_data = get_user_data(user_id)
+        st.session_state.role = user_data[0].get("role")
+        st.session_state.status = user_data[0].get("status")
 
     except Exception as e:
         raise Exception(f"Error during sign-up: {e}")
@@ -63,7 +69,10 @@ def sign_in_user(email, password):
             st.session_state.logged_in = True
             st.session_state.email = email
             st.session_state.id = response.user.id
-            add_reload()
+            user_data = get_user_data(st.session_state.id)
+            st.session_state.role = user_data[0].get("role")
+            st.session_state.status = user_data[0].get("status")
+            
             st.success(f"Welcome back, {email}!")
         else:
             st.error("Invalid email or password.")
@@ -78,38 +87,42 @@ def get_blacklist():
 
 
 # Add this function to allow users to submit blacklist suggestions
-def suggest_blacklist_word(word: str, submitted_by: str = None):
+def suggest_blacklist_word(word: str):
     client = SupabaseClient.get_client()
     payload = {"word": word, "status": "pending"}
-    if submitted_by:
-        payload["submitted_by"] = submitted_by  # must match uuid if used
+    payload["submitted_by"] = st.session_state.id  # must match uuid if used
     response = client.table("blacklist").insert(payload).execute()
     return response.data
 
 def add_reload():
     client = SupabaseClient.get_client()
+
     if "user" not in st.session_state:
-        # Optional: you can identify user via a temporary session cookie or query param
         session_rows = client.table("sessions").select("*").order("created_at", desc=True).limit(1).execute()
 
         if session_rows.data:
             token = session_rows.data[0]["refresh_token"]
-
-            # Restore session using Supabase
-            restored = client.auth.set_session(access_token="", refresh_token=token)
+            restored = client.auth.set_session(access_token=None, refresh_token=token)
 
             if restored.session:
-                st.session_state.id = restored.user.id
-                st.session_state.id = restored.user.email
-                st.session_state.logged_in = True
+                st.session_state.user = restored.user
+                st.session_state.email = restored.user.email
+                st.session_state.user_id = restored.user.id
                 st.session_state.refresh_token = restored.session.refresh_token
+                st.session_state.logged_in = True
+
 
 def check_reload():
     client = SupabaseClient.get_client()
     session_res = client.table("sessions").select("*").order("created_at", desc=True).limit(1).execute()
+    
     if session_res.data:
         refresh_token = session_res.data[0]["refresh_token"]
-        restored = client.auth.set_session("", refresh_token)
+        restored = client.auth.set_session(access_token=None, refresh_token=refresh_token)
+        
         if restored.session:
             st.session_state.user = restored.user
+            st.session_state.email = restored.user.email
+            st.session_state.id = restored.user.id
             st.session_state.refresh_token = restored.session.refresh_token
+            st.session_state.logged_in = True

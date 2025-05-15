@@ -8,17 +8,15 @@ from argon2 import PasswordHasher
 st.title("Login")
 
 # Session state
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
+for key, default in {
+    "logged_in": False,
+    "username": "",
+    "role": "",
+    "status": ""
+}.items():
+    if key not in st.session_state:
+        st.session_state[key] = default
 
-if 'username' not in st.session_state:
-    st.session_state.username = ""
-
-if 'role' not in st.session_state:
-    st.session_state.role = ""
-
-# Set up the password hasher
-#ph = PasswordHasher()
 
 if not st.session_state.logged_in:
 
@@ -46,21 +44,13 @@ if not st.session_state.logged_in:
                # return
 
             try:
-                # ph.verify(stored_hash, password)
                 sign_in_user(username, password)
-
-                # Set session state
-                #st.session_state.logged_in = True
-                #st.session_state.username = username
-                #st.session_state.id = user_data[0].get("id")
 
 
             except Exception:
                 st.error("Invalid password")
 
-    if __name__ == "__main__":
-        check_reload()
-        sign_in()
+    sign_in()
 
 else:
 
