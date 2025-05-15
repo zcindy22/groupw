@@ -1,5 +1,7 @@
 # supabase/db_utils.py
 import supabase
+import math
+from typing import Literal
 from supabase_proj.client import SupabaseClient
 import streamlit as st
 
@@ -22,6 +24,15 @@ def insert_user(username: str, password_hash: str):
     }).execute()
     return response.data
 
+def words_to_tokens(words: int) -> int:
+    """Convert word count to token estimate (1 token ≈ ¾ words)."""
+    return math.ceil(words * 1.33)
+
+def chars_to_tokens(chars: int) -> int:
+    """Convert character count to token estimate (1 token ≈ 4 chars)."""
+    return math.ceil(chars / 4)
+
+def get_token_balance(user_id: str) -> int:
 def suspend_user():
     client = SupabaseClient.get_service_client()
     client.table("profiles").update({

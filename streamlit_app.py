@@ -3,6 +3,13 @@ import re
 import json
 import os
 
+#if 'logged_in' not in st.session_state:
+#    st.session_state.logged_in = False
+#if 'username' not in st.session_state:
+#    st.session_state.username = None
+#if 'user_id' not in st.session_state:
+#    st.session_state.user_id = None
+
 st.set_page_config(
     page_title="TextAide – Your AI Workspace",
     page_icon="🧠",

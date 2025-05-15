@@ -1,3 +1,4 @@
+#template page for admin dashboard
 import streamlit as st
 import requests
 import json

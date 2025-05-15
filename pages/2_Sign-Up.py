@@ -38,3 +38,5 @@ with st.form("signup_form"):
 
             except Exception as e: 
                 st.error(f"Error: {e}")
+
+

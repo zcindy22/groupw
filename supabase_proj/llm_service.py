@@ -1,48 +1,40 @@
 # supabase_proj/llm_service.py
+
+import openai
 import os
-from supabase_proj.client import SupabaseClient
-from typing import List, Dict
+import json
+from dotenv import load_dotenv
 
-# Feature‐flag: "dryrun" until you wire up the real API
-PROVIDER = os.getenv("LLM_PROVIDER", "dryrun")
-'''
-def correct(text: str) -> List[Dict]:
-    """
-    Returns a list of correction suggestions, each a dict:
-      { "id": str, "start": int, "end": int, "suggestion": str }
-    In dryrun mode, returns [] so UI can be built first.
-    """
-    if PROVIDER == "dryrun":
+load_dotenv()
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+def correct(text: str):
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            temperature=0.0,
+            messages=[
+                {"role": "system", "content": "You are a grammar assistant. Return only a JSON array of {id, start, end, suggestion}."},
+                {"role": "user", "content": text},
+            ],
+        )
+        suggestions = json.loads(response.choices[0].message.content.strip())
+        return [{
+            "id": str(s["id"]),
+            "start": int(s["start"]),
+            "end": int(s["end"]),
+            "suggestion": s["suggestion"]
+        } for s in suggestions]
+    except Exception as e:
+        print("LLM error:", e)
         return []
-    return _correct_remote(text)
-'''
 
-def correct(text: str) -> List[Dict]:
-    if PROVIDER == "dryrun":
-        return [
-            { "id": "1", "start": 0, "end": min(4, len(text)), "suggestion": "TEST" },
-            { "id": "2", "start": min(5,len(text)), "end": min(10,len(text)), "suggestion": "MOCK" }
-        ]
-    return _correct_remote(text)
-
-
-def feedback(username: str, suggestion_id: str, action: str, reason: str = "") -> None:
-    """
-    Record the user’s Accept/Reject action for admin review.
-    """
+def feedback(user_id: str, suggestion_id: str, action: str, reason: str = ""):
+    from supabase_proj.client import SupabaseClient
     client = SupabaseClient.get_client()
-    # Assumes you have a "feedback" table with columns
-    #   username, suggestion_id, action, reason
     client.table("feedback").insert({
-        "username": username,
+        "username": user_id,
         "suggestion_id": suggestion_id,
         "action": action,
         "reason": reason
     }).execute()
-
-def _correct_remote(text: str) -> List[Dict]:
-    """
-    Replace this with your real LLM call (OpenAI, Vertex AI, etc.).
-    Should return the same structure as the stub above.
-    """
-    raise NotImplementedError("Hook up your LLM here")

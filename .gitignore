@@ -38,4 +38,11 @@ $RECYCLE.BIN/
 *.sqlite3
 *.db
 *.bak
+<<<<<<< Updated upstream
 jsonkeys/llm-editor-w.json
+=======
+
+# ────────── Ignore service account keys ──────────
+jsonkeys/*.json
+.env
+>>>>>>> Stashed changes
