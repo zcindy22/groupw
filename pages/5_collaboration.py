@@ -12,10 +12,10 @@ from supabase_proj.db_utils import (
 st.set_page_config(page_title="Collaboration Requests", layout="centered")
 st.title("🤝 Collaboration Requests")
 
-# ---------- Complaints Link ----------
+#  Complaints 
 st.markdown("---")
 if st.button("📣 Submit a Complaint"):
-    st.switch_page("pages/6_Complaints.py")  # Adjust filename if it's different
+    st.switch_page("pages/6_Complaints.py")  
 
 
 if not st.session_state.get("logged_in"):
@@ -51,8 +51,8 @@ else:
             )
             st.success(f"Collaboration request sent to {invitee_email} for '{selected_docname}'")
 
-# ----- Incoming Requests -----
-st.subheader("📥 Incoming Collaboration Requests")
+#   Requests from 
+st.subheader("📥 Collaboration Requests")
 incoming = get_incoming_collab_requests(user_id)
 if not incoming:
     st.info("No incoming requests.")
@@ -71,7 +71,7 @@ else:
                 st.warning("Request rejected.")
                 st.rerun()
 
-# ----- Outgoing Requests -----
+# Outgoing Requests the requests that the user has sent
 st.markdown("---")
 st.subheader("📤 Sent Collaboration Requests")
 outgoing = get_outgoing_collab_requests(user_id)

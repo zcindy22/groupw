@@ -15,7 +15,7 @@ if "complaint_updates" not in st.session_state:
 
 st.title("📬 Notifications Dashboard")
 
-# === Collaboration Requests Section ===
+#  Collaboration Requests Section 
 st.header("🤝 Collaboration Requests")
 
 if st.session_state.collab_requests:
@@ -35,7 +35,7 @@ if st.session_state.collab_requests:
 else:
     st.info("No pending collaboration requests.")
 
-# === Complaint Notifications Section ===
+#Complaint Notifications Section 
 st.header("📣 Complaint Status Updates")
 
 if st.session_state.complaint_updates:

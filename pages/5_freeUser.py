@@ -24,7 +24,7 @@ if st.session_state.role != "free":
     st.error("Please use the paid user editor!")
     st.stop()
 
-# --- Input method ---
+#  Input method 
 input_type = st.radio("Choose input method:", ["Text Box", "Upload .txt File"])
 user_text = ""
 
@@ -61,7 +61,7 @@ if st.button("Submit"):
             st.text_area("Self-correction (editable):", value=filtered_text, height=150)
         except Exception as e:
             st.error("Could not connect to backend.")
-            st.text(str(e))  # Optional: debug display
+            st.text(str(e))  
 
 #  Suggest a word to be blacklisted 
 st.markdown("---")
