@@ -14,18 +14,11 @@ def see_username_exist(email: str):
     response = client.table("profiles").select("*").eq("email", email).execute()
     return response.data  # This is a list of matching user records
 
-def insert_user(username: str, password_hash: str):
-    client = SupabaseClient.get_client()
-    response = client.table("users").insert({
-        "username": username,
-        "password_hash": password_hash
-    }).execute()
-    return response.data
-
 def suspend_user():
     client = SupabaseClient.get_service_client()
     client.table("profiles").update({
     "status": "suspended"}).eq("id", st.session_state.id).execute()
+    st.session_state.status = "suspended"
 
 def add_tokens(amount: int):
     client = SupabaseClient.get_client()
@@ -87,6 +80,58 @@ def sign_in_user(email, password):
     except Exception as e:
         st.error(f"Error logging in: {e}")
 
+def get_collaborations():
+    client = SupabaseClient.get_client()
+    response = client.rpc("get_user_collaborations", {"_user_id": st.session_state.id}).execute()
+    st.session_state.collab_requests = response.data
+
+def accept_collaboration():
+
+    client = SupabaseClient.get_service_client()
+    client.table("collaborations") \
+        .update({"status": "accepted"}) \
+        .eq("id", st.session_state.accepted_collaboration_id) \
+        .execute()
+
+def reject_collaboration():
+    client = SupabaseClient.get_service_client()
+    response = client.table("collaborations") \
+        .update({"status": "rejected"}) \
+        .eq("id", st.session_state.accepted_collaboration_id) \
+        .execute()
+    
+    text_id = response.data[0]["text_id"]
+
+    client.table("texts") \
+        .update({"status": "single"}) \
+        .eq("id", text_id) \
+        .execute()
+
+def show_complains():
+    client = SupabaseClient.get_client()
+    response = client.table("complaints").select("*") \
+        .eq("complainer_id", st.session_state.id).eq("seen", "show").neq("status", "pending").execute()
+    st.session_state.complaint_updates = response.data
+
+def dismiss_complains(complaint_id):
+    client = SupabaseClient.get_service_client()
+    client.table("complaints") \
+        .update({"seen": "hide"}) \
+        .eq("id", complaint_id) \
+        .execute()
+
+def show_against_complains():
+    client = SupabaseClient.get_client()
+    response = client.table("complaints").select("*") \
+        .eq("accused_id", st.session_state.id).eq("seen", "show").neq("status", "pending").execute()
+    st.session_state.complaints_against_user = response.data
+
+def dismiss_against_complains(accused_id):
+    client = SupabaseClient.get_service_client()
+    client.table("complaints") \
+        .update({"seen": "hide"}) \
+        .eq("id", accused_id) \
+        .execute()
 
 def get_blacklist():
     client = SupabaseClient.get_client()
@@ -101,36 +146,3 @@ def suggest_blacklist_word(word: str):
     payload["submitted_by"] = st.session_state.id  # must match uuid if used
     response = client.table("blacklist").insert(payload).execute()
     return response.data
-
-def add_reload():
-    client = SupabaseClient.get_client()
-
-    if "user" not in st.session_state:
-        session_rows = client.table("sessions").select("*").order("created_at", desc=True).limit(1).execute()
-
-        if session_rows.data:
-            token = session_rows.data[0]["refresh_token"]
-            restored = client.auth.set_session(access_token=None, refresh_token=token)
-
-            if restored.session:
-                st.session_state.user = restored.user
-                st.session_state.email = restored.user.email
-                st.session_state.user_id = restored.user.id
-                st.session_state.refresh_token = restored.session.refresh_token
-                st.session_state.logged_in = True
-
-
-def check_reload():
-    client = SupabaseClient.get_client()
-    session_res = client.table("sessions").select("*").order("created_at", desc=True).limit(1).execute()
-    
-    if session_res.data:
-        refresh_token = session_res.data[0]["refresh_token"]
-        restored = client.auth.set_session(access_token=None, refresh_token=refresh_token)
-        
-        if restored.session:
-            st.session_state.user = restored.user
-            st.session_state.email = restored.user.email
-            st.session_state.id = restored.user.id
-            st.session_state.refresh_token = restored.session.refresh_token
-            st.session_state.logged_in = True

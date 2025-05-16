@@ -17,7 +17,7 @@ if 'logged_in' not in st.session_state:
     st.stop()
 
 if st.session_state.status == "suspended":
-    st.error("Your account is suspended for 3 minutes due to word limit violation.")
+    st.error("You entered more than 20 words. You are suspended for 3 minutes.")
     st.stop()
 
 if st.session_state.role != "free":
@@ -43,7 +43,8 @@ if st.button("Submit"):
 
     if word_count > 20:
         suspend_user()
-        st.error("You entered more than 20 words. You are suspended for 3 minutes.")
+        st.rerun()
+        #st.error("You entered more than 20 words. You are suspended for 3 minutes.")
     elif word_count == 0:
         st.warning("Please enter some text.")
 

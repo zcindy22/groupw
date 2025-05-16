@@ -2,7 +2,7 @@ import streamlit as st
 
 st.set_page_config(page_title="Login", layout="centered")
 
-from supabase_proj.db_utils import get_user_data, sign_in_user, check_reload
+from supabase_proj.db_utils import get_user_data, sign_in_user
 from argon2 import PasswordHasher
 
 st.title("Login")
